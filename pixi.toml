@@ -16,7 +16,7 @@ NUMEXPR_MAX_THREADS = "256"
 NUMEXPR_NUM_THREADS = "8"
 
 [dependencies]
-mojo = "==1.0.0b3.dev2026072406"
+mojo = "==1.1.0.dev2026081105"
 python = "3.13.*"
 pytest = "*"
 numpy = "*"

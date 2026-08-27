@@ -222,7 +222,7 @@ def process_order_range(
         var signed_shares = direction * shares
         txn_amount[i] = signed_shares
         txn_price[i] = execution_price
-        txn_commission[i] = commission_for_fill(
+        var fill_commission = commission_for_fill(
             commission_kind,
             signed_shares,
             execution_price,
@@ -231,6 +231,13 @@ def process_order_range(
             commission_cost,
             commission_minimum,
         )
+        txn_commission[i] = fill_commission
+        filled[i] += signed_shares
+        paid_commission[i] += fill_commission
+        if filled[i] == amount[i]:
+            status[i] = 1
+        elif status[i] == 4:
+            status[i] = 0
         changed[i] = 1
         used += shares
 

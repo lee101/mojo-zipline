@@ -243,6 +243,25 @@ def test_partial_fill_commission_and_pruning():
     assert blotter.get_open_orders() == {}
 
 
+def test_market_fill_fast_path_keeps_native_state_in_sync():
+    asset = mz.Equity(1, "A")
+    blotter = mz.SimulationBlotter(
+        equity_slippage=mz.NoSlippage(),
+        equity_commission=mz.PerShare(cost=0.25),
+    )
+    blotter.current_dt = 0
+    order_id = blotter.order(asset, 2, mz.MarketOrder())
+    txns, commissions, closed = blotter.get_transactions(FakeData(10, 100, 1))
+    order = blotter.orders[order_id]
+    buffer = blotter._buffers[asset]
+    assert [(txn.amount, txn.price) for txn in txns] == [(2, 10.0)]
+    assert commissions[0]["cost"] == 0.5
+    assert closed == [order]
+    assert order.filled == buffer.filled[0] == 2
+    assert order.commission == buffer.paid[0] == 0.5
+    assert buffer.status[0] == mz.ORDER_STATUS.FILLED
+
+
 def test_blotter_rejects_fractional_amount_instead_of_narrowing():
     blotter = mz.SimulationBlotter()
     with pytest.raises(TypeError, match="integer"):

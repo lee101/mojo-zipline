@@ -460,44 +460,52 @@ class SimulationBlotter:
         transactions = []
         commissions = []
         closed = []
+        orders = buffer.orders
+        stop_active = buffer.stop_active
+        stop_reached = buffer.stop_reached
+        limit_reached = buffer.limit_reached
+        txn_amount = buffer.txn_amount
+        txn_price = buffer.txn_price
+        txn_commission = buffer.txn_commission
+        filled = buffer.filled
+        paid = buffer.paid
+        status = buffer.status
+        append_transaction = transactions.append
+        append_commission = commissions.append
+        append_closed = closed.append
         for i in np.flatnonzero(arrays["changed"]):
-            order = buffer.orders[i]
-            old_trigger_state = (
-                order.stop,
-                order.stop_reached,
-                order.limit_reached,
-            )
-            if order.stop is not None and not arrays["stop_active"][i]:
-                order.stop = None
-            order.stop_reached = bool(arrays["stop_reached"][i])
-            order.limit_reached = bool(arrays["limit_reached"][i])
-            if old_trigger_state != (
-                order.stop,
-                order.stop_reached,
-                order.limit_reached,
-            ):
-                order.dt = current_dt
-            if arrays["txn_amount"][i] == 0:
+            order = orders[i]
+            if order.stop is not None or order.limit is not None:
+                old_stop = order.stop
+                old_stop_reached = order.stop_reached
+                old_limit_reached = order.limit_reached
+                if old_stop is not None and not stop_active[i]:
+                    order.stop = None
+                order.stop_reached = bool(stop_reached[i])
+                order.limit_reached = bool(limit_reached[i])
+                if (
+                    old_stop != order.stop
+                    or old_stop_reached != order.stop_reached
+                    or old_limit_reached != order.limit_reached
+                ):
+                    order.dt = current_dt
+            amount = int(txn_amount[i])
+            if amount == 0:
                 continue
             txn = Transaction(
-                asset=order.asset,
-                amount=int(arrays["txn_amount"][i]),
-                dt=current_dt,
-                price=float(arrays["txn_price"][i]),
-                order_id=order.id,
+                order.asset, amount, current_dt, txn_price[i], order.id
             )
-            cost = float(arrays["txn_commission"][i])
+            cost = txn_commission[i]
             if cost > 0:
-                commissions.append({"asset": order.asset, "order": order, "cost": cost})
-            order.filled += txn.amount
-            order.commission += cost
-            order.dt = txn.dt
-            arrays["filled"][i] = order.filled
-            arrays["paid"][i] = order.commission
-            arrays["status"][i] = int(order.status)
-            transactions.append(txn)
-            if not order.open:
-                closed.append(order)
+                append_commission(
+                    {"asset": order.asset, "order": order, "cost": cost}
+                )
+            order.filled = filled[i]
+            order.commission = paid[i]
+            order.dt = current_dt
+            if status[i] == ORDER_STATUS.FILLED:
+                append_closed(order)
+            append_transaction(txn)
         return transactions, commissions, closed
 
     def prune_orders(self, closed_orders):

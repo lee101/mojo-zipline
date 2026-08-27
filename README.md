@@ -101,18 +101,23 @@ best of three runs.
 
 | case | mojo-zipline | zipline | result |
 | --- | ---: | ---: | ---: |
-| mixed order triggers (250k) | 20.06 ms | 215.95 ms | 10.77x faster |
-| non-triggering limit book (50k) | 1.18 ms | 37.82 ms | 32.01x faster |
-| volume fills + commission (20k) | 78.62 ms | 75.26 ms | 1.04x slower |
+| mixed order triggers (250k) | 16.27 ms | 212.98 ms | 13.09x faster |
+| non-triggering limit book (50k) | 1.00 ms | 36.39 ms | 36.28x faster |
+| volume fills + commission (20k) | 34.13 ms | 67.90 ms | 1.99x faster |
 
 The stateful blotter now builds persistent contiguous order buffers as orders
 arrive, so a bar no longer repacks every Python object. Native code marks only
 rows whose trigger or fill state changed, avoiding a full Python object scan
-on a cold book. The filling case still creates and updates Python transactions
-and orders, so it retains substantially more Python overhead than the
-trigger-only cases.
+on a cold book. Filled amounts, paid commission, and native status now stay in
+those buffers after the kernel call, and the market-fill collection path avoids
+generic trigger-state and order-status work. The filling case still creates
+Python transactions, orders, and commission records, so it retains more Python
+overhead than the trigger-only cases.
 
-There is no GPU path.
+There is no GPU path. Order processing is branch-heavy and moves substantially
+more buffer data than its small amount of arithmetic requires, remaining below
+the roughly two-flops-per-byte threshold. Shared per-asset volume also makes
+fills order-dependent, so GPU dispatch and transfers would not be justified.
 
 ## How it works
 
